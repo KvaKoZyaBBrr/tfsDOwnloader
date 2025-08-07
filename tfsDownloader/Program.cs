@@ -24,7 +24,8 @@ var config = new ConfigurationBuilder()
 var token = config.GetSection("Root:TfsToken").Value;
 var tfsUri = config.GetSection("Root:TfsUri").Value; 
 var rootFolder = config.GetSection("Root:RootFolder").Value;
-var projectNameFilter = config.GetSection("Root:ProjectName").Value;
+var projectsFilter = config.GetSection("Root:ProjectNames").GetChildren().Select(x => x.Value);
+var deleteTests = bool.TryParse(config.GetSection("Root:DeleteTests").Value, out var deleteTestsVar) ? deleteTestsVar : false;
 if (!Directory.Exists(rootFolder))
     Directory.CreateDirectory(rootFolder);
 var workDir = Path.Combine(rootFolder, DateTime.Now.ToString("u").Replace(":", "_"));
@@ -35,8 +36,8 @@ var errFile = Path.Combine(workDir, "err.log");
 File.Create(errFile);
 Directory.CreateDirectory(extractedPath);
 
-foreach (var unit in inputData.units.Where(x=>x.project == projectNameFilter))
-{ 
+foreach (var unit in inputData.units.Where(x => projectsFilter.Any(p=> p == x.project)))
+{
     var orgUrl = new Uri($"{tfsUri}/{unit.collection}");
     var connection = new VssConnection(orgUrl, new VssBasicCredential(string.Empty, token));
     using (var gitClient = connection.GetClient<GitHttpClient>())
@@ -64,6 +65,16 @@ foreach (var unit in inputData.units.Where(x=>x.project == projectNameFilter))
             var branchPath = Path.Combine(projectPath, unit.branch.Replace("/", "_"));
             Directory.CreateDirectory(branchPath);
             ZipFile.ExtractToDirectory(zipPath, branchPath);
+            if (deleteTests)
+            {
+                var testFileSolutions = Directory.GetFiles(branchPath, "*Test*.csproj", SearchOption.AllDirectories);
+                testFileSolutions.AddRange(Directory.GetFiles(branchPath, "*Test*.sln", SearchOption.AllDirectories));
+                foreach (var testFileSolution in testFileSolutions)
+                {
+                    var testDirectory = Path.GetDirectoryName(testFileSolution);
+                    Directory.Delete(testDirectory, true);
+                }
+            }
             File.Delete(zipPath);
             Console.WriteLine($"Проект {unit.definition.name} загружен");
         }
@@ -72,5 +83,9 @@ foreach (var unit in inputData.units.Where(x=>x.project == projectNameFilter))
             Console.WriteLine(ex.Message);
             File.AppendAllLines(errFile, [$"{unit.definition.name},  {unit.branch} : {ex.Message}"]);
         }
-    };
+    }
 }
+
+var zipResult = Path.Combine(workDir, "zipResult.zip");
+using var zipResultStream = new FileStream(zipResult, FileMode.Create);
+ZipFile.CreateFromDirectory(extractedPath, zipResultStream, compressionLevel: CompressionLevel.Optimal, includeBaseDirectory : true);
