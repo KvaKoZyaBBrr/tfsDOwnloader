@@ -6,14 +6,11 @@
 Пример appsettings.json:
 ```
 {
-    "Root":
-    {
-        "TfsToken":"vodoqdxxqxx3uinypssdd7asdnqdfuqy77cy27fq", <-- токен доступа к tfs
-        "TfsUri":"https://tfs:8443/tfs",<-- адрес tfs
-        "RootFolder":"D:\\_Outputs\\TestTfs", <-- папка для хранения резульатов
-        "ProjectNames":["Platform", "External"], <-- имена проектов откуда забирать. Проекты которые не указаны в этом списке будут проигнорированы
-        "DeleteTests":true <-- удалять ли тесты из проекта. Удаление по маске  "*Test*.sln" и "*Test*.csproj" 
-    }
+      "TfsToken":"vodoqdxxqxx3uinypssdd7asdnqdfuqy77cy27fq", <-- токен доступа к tfs
+      "TfsUri":"https://tfs:8443/tfs",<-- адрес tfs
+      "RootFolder":"D:\\_Outputs\\TestTfs", <-- папка для хранения резульатов
+      "ProjectNames":["Platform", "External"], <-- имена проектов откуда забирать. Проекты которые не указаны в этом списке будут проигнорированы
+      "DeleteTests":true <-- удалять ли тесты из проекта. Удаление по маске  "*Test*.sln" и "*Test*.csproj" 
 }
 ```
 
@@ -28,8 +25,9 @@ input.json брался из subscription.json в проектах. Поэтом
     {
       "collection": "Collection", <-- коллекция
       "project": "Platform", <-- проект в коллекции
+      "repositoryName" : "host", <-- репозиторий
       "definition": {
-        "name": "host" <-- репозиторий
+        "name": "host" <-- имя пайплайна. Зачастую совпадает с именем репозитория, но не всегда
       },
       "branch": "prod", <-- ветка
       "robocopy": []<-- не влияет ни на что
@@ -38,7 +36,7 @@ input.json брался из subscription.json в проектах. Поэтом
       "collection": "Collection", <-- коллекция
       "project": "Platform", <-- проект в коллекции
       "definition": {
-        "name": "thirdparty" <-- репозиторий
+        "name": "thirdparty" <-- имя пайплайна. Зачастую совпадает с именем репозитория, но не всегда
       },
       "branch": "master", <-- ветка
       "robocopy": []<-- не влияет ни на что

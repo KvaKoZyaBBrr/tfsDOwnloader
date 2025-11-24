@@ -2,5 +2,5 @@
 .vs/
 bin/
 obj/
-*/appsettings.Development.json
-*/input.Development.json
+**/appsettings.Development.json
+**/input.Development.json

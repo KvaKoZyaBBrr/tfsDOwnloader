@@ -5,30 +5,23 @@ using Microsoft.VisualStudio.Services.WebApi;
 
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
+using System.ComponentModel.DataAnnotations;
 
-var input = File.ReadAllText("input.json");
-var inputData = JsonSerializer.Deserialize<Data>(input);
-
-if (File.Exists("input.Development.json"))
+var input = File.Exists("input.Development.json") ? File.ReadAllText("input.Development.json") : File.ReadAllText("input.json");
+var options = new JsonSerializerOptions()
 {
-    var inputDevelop = File.ReadAllText("input.Development.json");
-    var inputDevelopData = JsonSerializer.Deserialize<Data>(inputDevelop);
-    inputData.units.AddRange(inputDevelopData.units);
-}   
-Console.WriteLine(inputData.units.Count);
-var config = new ConfigurationBuilder()
-    .AddJsonFile("appsettings.json")
-    .AddJsonFile("appsettings.Development.json", true)
-    .Build();
+    PropertyNameCaseInsensitive = true
+};
+var inputData = JsonSerializer.Deserialize<Data>(input, options);
 
-var token = config.GetSection("Root:TfsToken").Value;
-var tfsUri = config.GetSection("Root:TfsUri").Value; 
-var rootFolder = config.GetSection("Root:RootFolder").Value;
-var projectsFilter = config.GetSection("Root:ProjectNames").GetChildren().Select(x => x.Value);
-var deleteTests = bool.TryParse(config.GetSection("Root:DeleteTests").Value, out var deleteTestsVar) ? deleteTestsVar : false;
-if (!Directory.Exists(rootFolder))
-    Directory.CreateDirectory(rootFolder);
-var workDir = Path.Combine(rootFolder, DateTime.Now.ToString("u").Replace(":", "_"));
+Console.WriteLine(inputData.Units.Count);
+var configFile = File.Exists("appsettings.Development.json") ? File.ReadAllText("appsettings.Development.json") : File.ReadAllText("appsettings.json");
+var config = JsonSerializer.Deserialize<Configuration>(configFile);
+
+if (!Directory.Exists(config.RootFolder))
+    Directory.CreateDirectory(config.RootFolder);
+
+var workDir = Path.Combine(config.RootFolder, DateTime.Now.ToString("u").Replace(":", "_"));
 Directory.CreateDirectory(workDir);
 var zipPath = Path.Combine(workDir, "temp.zip");
 var extractedPath = Path.Combine(workDir, "Extracted");
@@ -36,20 +29,21 @@ var errFile = Path.Combine(workDir, "err.log");
 File.Create(errFile);
 Directory.CreateDirectory(extractedPath);
 
-foreach (var unit in inputData.units.Where(x => projectsFilter.Any(p=> p == x.project)))
+foreach (var unit in inputData.Units.Where(x => config.ProjectNames.Any(p=> p == x.Project)))
 {
-    var orgUrl = new Uri($"{tfsUri}/{unit.collection}");
-    var connection = new VssConnection(orgUrl, new VssBasicCredential(string.Empty, token));
+    var orgUrl = new Uri($"{config.TfsUri}/{unit.Collection}");
+    var connection = new VssConnection(orgUrl, new VssBasicCredential(string.Empty, config.TfsToken));
     using (var gitClient = connection.GetClient<GitHttpClient>())
     {
         Console.WriteLine("Получение информации о проекте");
+        var repoName = unit.RepositoryName ?? unit.Definition.Name;
         try
         {
-            var repo = await gitClient.GetRepositoryAsync(unit.project, unit.definition.name);
-            var branch = await gitClient.GetBranchAsync(repo.Id, unit.branch);
+            var repo = await gitClient.GetRepositoryAsync(unit.Project, repoName);
+            var branch = await gitClient.GetBranchAsync(repo.Id, unit.Branch);
             var commit = branch.Commit;
 
-            Console.WriteLine($"Скачивание проекта {unit.definition.name}...");
+            Console.WriteLine($"Скачивание проекта {repoName}...");
             // Download zip and extract to targetPath
             using var zipStream = await gitClient.GetItemZipAsync(repo.Id, "/", versionDescriptor: new GitVersionDescriptor()
             {
@@ -60,12 +54,12 @@ foreach (var unit in inputData.units.Where(x => projectsFilter.Any(p=> p == x.pr
             {
                 zipStream.CopyTo(fileStream);
             }
-            Console.WriteLine($"Распаковка проекта {unit.definition.name}...");
-            var projectPath = Path.Combine(extractedPath, unit.definition.name);
-            var branchPath = Path.Combine(projectPath, unit.branch.Replace("/", "_"));
+            Console.WriteLine($"Распаковка проекта {repoName}...");
+            var projectPath = Path.Combine(extractedPath, repoName);
+            var branchPath = Path.Combine(projectPath, unit.Branch.Replace("/", "_"));
             Directory.CreateDirectory(branchPath);
             ZipFile.ExtractToDirectory(zipPath, branchPath);
-            if (deleteTests)
+            if (config.DeleteTests)
             {
                 var testFileSolutions = Directory.GetFiles(branchPath, "*Test*.csproj", SearchOption.AllDirectories);
                 testFileSolutions.AddRange(Directory.GetFiles(branchPath, "*Test*.sln", SearchOption.AllDirectories));
@@ -76,12 +70,12 @@ foreach (var unit in inputData.units.Where(x => projectsFilter.Any(p=> p == x.pr
                 }
             }
             File.Delete(zipPath);
-            Console.WriteLine($"Проект {unit.definition.name} загружен");
+            Console.WriteLine($"Проект {repoName} загружен");
         }
         catch (Exception ex)
         {
             Console.WriteLine(ex.Message);
-            File.AppendAllLines(errFile, [$"{unit.definition.name},  {unit.branch} : {ex.Message}"]);
+            File.AppendAllLines(errFile, [$"{repoName},  {unit.Branch} : {ex.Message}"]);
         }
     }
 }
