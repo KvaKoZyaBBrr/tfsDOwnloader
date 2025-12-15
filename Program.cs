@@ -26,7 +26,8 @@ Directory.CreateDirectory(workDir);
 var zipPath = Path.Combine(workDir, "temp.zip");
 var extractedPath = Path.Combine(workDir, "Extracted");
 var errFile = Path.Combine(workDir, "err.log");
-File.Create(errFile);
+using var errFileStream = File.Create(errFile);
+using var errWriter = new StreamWriter(errFileStream);
 Directory.CreateDirectory(extractedPath);
 
 foreach (var unit in inputData.Units.Where(x => config.ProjectNames.Any(p=> p == x.Project)))
@@ -69,13 +70,21 @@ foreach (var unit in inputData.Units.Where(x => config.ProjectNames.Any(p=> p ==
                     Directory.Delete(testDirectory, true);
                 }
             }
+            if (config.OnlyCs)
+            {
+                var nonCsFiles = Directory.GetFiles(branchPath, "*.*", SearchOption.AllDirectories).Except(Directory.GetFiles(branchPath, "*.cs", SearchOption.AllDirectories));
+                foreach (var nonCsFile in nonCsFiles)
+                {
+                    File.Delete(nonCsFile);
+                }
+            }
             File.Delete(zipPath);
             Console.WriteLine($"Проект {repoName} загружен");
         }
         catch (Exception ex)
         {
             Console.WriteLine(ex.Message);
-            File.AppendAllLines(errFile, [$"{repoName},  {unit.Branch} : {ex.Message}"]);
+            errWriter.WriteLine($"{repoName},  {unit.Branch} : {ex.Message}");
         }
     }
 }
