@@ -10,6 +10,7 @@ class Unit
     public string Branch { get; set; }
     public string RepositoryName { get; set; }
     public Definition Definition { get; set; }
+    public bool Ignore { get; set; } = false;
 }
 
 class Definition

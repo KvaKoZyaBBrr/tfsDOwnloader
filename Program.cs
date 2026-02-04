@@ -4,9 +4,8 @@ using Microsoft.VisualStudio.Services.Common;
 using Microsoft.VisualStudio.Services.WebApi;
 
 using System.Text.Json;
-using Microsoft.Extensions.Configuration;
-using System.ComponentModel.DataAnnotations;
 
+//TODO: Переделать на получение всего из конфига. Путь до настроек + путь до списка проектов + суффикс
 var input = File.Exists("input.Development.json") ? File.ReadAllText("input.Development.json") : File.ReadAllText("input.json");
 var options = new JsonSerializerOptions()
 {
@@ -23,9 +22,9 @@ if (!Directory.Exists(config.RootFolder))
 
 var suffix = "";
 if (args.Length > 0)
-    suffix = args[0];
+    suffix = $"_{args[0]}";
 
-var workDir = Path.Combine(config.RootFolder, DateTime.Now.ToString("u").Replace(":", "_"), suffix);
+var workDir = Path.Combine(config.RootFolder, DateTime.Now.ToString("u").Replace(":", "_") + suffix);
 Directory.CreateDirectory(workDir);
 var zipPath = Path.Combine(workDir, "temp.zip");
 var extractedPath = Path.Combine(workDir, "Extracted");
@@ -36,12 +35,17 @@ Directory.CreateDirectory(extractedPath);
 
 foreach (var unit in inputData.Units.Where(x => config.ProjectNames.Any(p=> p == x.Project)))
 {
+    var repoName = unit.RepositoryName ?? unit.Definition.Name;
+    if (unit.Ignore)
+    {
+        Console.WriteLine($"Проект {repoName} проигнорирован");
+        continue;
+    }
     var orgUrl = new Uri($"{config.TfsUri}/{unit.Collection}");
     var connection = new VssConnection(orgUrl, new VssBasicCredential(string.Empty, config.TfsToken));
     using (var gitClient = connection.GetClient<GitHttpClient>())
     {
         Console.WriteLine("Получение информации о проекте");
-        var repoName = unit.RepositoryName ?? unit.Definition.Name;
         try
         {
             var repo = await gitClient.GetRepositoryAsync(unit.Project, repoName);
