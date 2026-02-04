@@ -21,7 +21,11 @@ var config = JsonSerializer.Deserialize<Configuration>(configFile);
 if (!Directory.Exists(config.RootFolder))
     Directory.CreateDirectory(config.RootFolder);
 
-var workDir = Path.Combine(config.RootFolder, DateTime.Now.ToString("u").Replace(":", "_"));
+var suffix = "";
+if (args.Length > 0)
+    suffix = args[0];
+
+var workDir = Path.Combine(config.RootFolder, DateTime.Now.ToString("u").Replace(":", "_"), suffix);
 Directory.CreateDirectory(workDir);
 var zipPath = Path.Combine(workDir, "temp.zip");
 var extractedPath = Path.Combine(workDir, "Extracted");
